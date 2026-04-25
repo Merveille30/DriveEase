@@ -2,71 +2,69 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-const authRoutes = require('./routes/auth');
-const vehicleRoutes = require('./routes/vehicles');
-const bookingRoutes = require('./routes/bookings');
-const brandRoutes = require('./routes/brands');
-const contactRoutes = require('./routes/contact');
-const adminRoutes = require('./routes/admin');
-const pageRoutes = require('./routes/pages');
-const uploadRoutes = require('./routes/upload');
-const notificationRoutes = require('./routes/notifications');
-
 const app = express();
 
-// CORS
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
-  : [];
-
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (process.env.NODE_ENV !== 'production') return callback(null, true);
-    if (allowedOrigins.length === 0) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true
-}));
-
+app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/vehicles', vehicleRoutes);
-app.use('/api/bookings', bookingRoutes);
-app.use('/api/brands', brandRoutes);
-app.use('/api/contact', contactRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/pages', pageRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/notifications', notificationRoutes);
-
+// Health check — no DB needed
+app.get('/', (req, res) => res.json({ message: 'DriveEase API v1.0.0', status: 'ok' }));
 app.get('/api/health', (req, res) => res.json({
   status: 'ok',
-  env: process.env.NODE_ENV,
+  env: process.env.NODE_ENV || 'unknown',
   supabase: !!process.env.SUPABASE_URL,
   resend: !!process.env.RESEND_API_KEY,
+  time: new Date().toISOString(),
 }));
 
-app.get('/', (req, res) => res.json({ message: 'DriveEase API v1.0.0' }));
+// Load routes — wrapped in try/catch so we can see which one fails
+try {
+  app.use('/api/auth', require('./routes/auth'));
+} catch(e) { console.error('auth route failed:', e.message); }
+
+try {
+  app.use('/api/vehicles', require('./routes/vehicles'));
+} catch(e) { console.error('vehicles route failed:', e.message); }
+
+try {
+  app.use('/api/bookings', require('./routes/bookings'));
+} catch(e) { console.error('bookings route failed:', e.message); }
+
+try {
+  app.use('/api/brands', require('./routes/brands'));
+} catch(e) { console.error('brands route failed:', e.message); }
+
+try {
+  app.use('/api/contact', require('./routes/contact'));
+} catch(e) { console.error('contact route failed:', e.message); }
+
+try {
+  app.use('/api/admin', require('./routes/admin'));
+} catch(e) { console.error('admin route failed:', e.message); }
+
+try {
+  app.use('/api/pages', require('./routes/pages'));
+} catch(e) { console.error('pages route failed:', e.message); }
+
+try {
+  app.use('/api/upload', require('./routes/upload'));
+} catch(e) { console.error('upload route failed:', e.message); }
+
+try {
+  app.use('/api/notifications', require('./routes/notifications'));
+} catch(e) { console.error('notifications route failed:', e.message); }
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Global error:', err.message);
   res.status(500).json({ error: err.message });
 });
 
-// Only start HTTP server when running locally (NOT on Vercel)
+// Only listen locally — Vercel handles HTTP in production
 if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => {
-    console.log(`✅ Server running on http://localhost:${PORT}`);
-    console.log(`   Health: http://localhost:${PORT}/api/health`);
-  });
+  app.listen(PORT, () => console.log(`✅ Server on http://localhost:${PORT}`));
 }
 
-// Export for Vercel serverless
 module.exports = app;
