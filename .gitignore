@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Environment files - NEVER commit these
+.env
+.env.local
+.env.production
+
+# Build output
+dist/
+build/
+
+# Uploads (local files)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Old PHP project (not needed for deployment)
+carrental/
+carrental-next/
