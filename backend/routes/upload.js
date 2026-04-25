@@ -4,10 +4,10 @@ const supabase = require('../lib/supabase');
 const { adminMiddleware } = require('../middleware/auth');
 const router = express.Router();
 
-// Store file in memory so we can upload to Supabase Storage
+// Memory storage — no local filesystem needed (works on Vercel)
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
     else cb(new Error('Only image files allowed'));
@@ -18,7 +18,7 @@ router.post('/', adminMiddleware, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image file provided' });
 
-    const ext = req.file.originalname.split('.').pop().toLowerCase();
+    const ext = req.file.originalname.split('.').pop().toLowerCase() || 'jpg';
     const filename = `vehicle-${Date.now()}.${ext}`;
 
     const { data, error } = await supabase.storage
@@ -30,7 +30,6 @@ router.post('/', adminMiddleware, upload.single('image'), async (req, res) => {
 
     if (error) return res.status(500).json({ error: error.message });
 
-    // Get public URL
     const { data: urlData } = supabase.storage
       .from('vehicle-images')
       .getPublicUrl(filename);
@@ -38,7 +37,7 @@ router.post('/', adminMiddleware, upload.single('image'), async (req, res) => {
     res.json({ url: urlData.publicUrl });
   } catch (err) {
     console.error('Upload error:', err);
-    res.status(500).json({ error: 'Upload failed' });
+    res.status(500).json({ error: 'Upload failed: ' + err.message });
   }
 });
 

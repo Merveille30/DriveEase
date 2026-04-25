@@ -2,12 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-// Warn if Supabase not configured
-if (!process.env.SUPABASE_URL || process.env.SUPABASE_URL.includes('your-project')) {
-  console.warn('\n⚠️  WARNING: Supabase not configured in backend/.env');
-  console.warn('   Set SUPABASE_URL and SUPABASE_SERVICE_KEY to connect to your database.\n');
-}
-
 const authRoutes = require('./routes/auth');
 const vehicleRoutes = require('./routes/vehicles');
 const bookingRoutes = require('./routes/bookings');
@@ -20,26 +14,25 @@ const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 
-// Allow all origins in development, restrict in production
+// CORS
 const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : [];
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // Postman / server-to-server
-    if (process.env.NODE_ENV !== 'production') return callback(null, true); // dev: allow all
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (!origin) return callback(null, true);
+    if (process.env.NODE_ENV !== 'production') return callback(null, true);
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) return callback(null, true);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded images
-app.use('/uploads', express.static('uploads'));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/bookings', bookingRoutes);
@@ -50,7 +43,15 @@ app.use('/api/pages', pageRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/health', (req, res) => res.json({
+  status: 'ok',
+  env: process.env.NODE_ENV,
+  supabase: !!process.env.SUPABASE_URL,
+  resend: !!process.env.RESEND_API_KEY,
+}));
+
+// Root
+app.get('/', (req, res) => res.json({ message: 'DriveEase API', version: '1.0.0' }));
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -60,6 +61,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-  console.log(`   Health check: http://localhost:${PORT}/api/health`);
+  console.log(`✅ Server running on port ${PORT}`);
 });
+
+module.exports = app;
